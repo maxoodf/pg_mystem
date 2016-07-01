@@ -1,6 +1,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <semaphore.h>
 #include <sys/mman.h>
 
@@ -8,6 +10,7 @@
 #include <vector>
 #include <random>
 #include <limits>
+#include <algorithm>
 
 #include <rapidjson/document.h>
 
@@ -161,13 +164,13 @@ public:
             return;
         }
         
-        m_inQueueShm = shm_open(inQueueShmName, O_RDWR);
+        m_inQueueShm = shm_open(inQueueShmName, O_RDWR, 0600);
         if (m_inQueueShm == -1) {
             m_errCode = errno;
             return;
         }
         
-        m_outQueueShm = shm_open(outQueueShmName, O_RDWR);
+        m_outQueueShm = shm_open(outQueueShmName, O_RDWR, 0600);
         if (m_outQueueShm == -1) {
             m_errCode = errno;
             return;

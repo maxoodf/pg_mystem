@@ -5,8 +5,9 @@ MODULES = pg_mystem
 # postgres build stuff
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
-SHARE_FOLDER := $(shell $(PG_CONFIG) --sharedir)
+#SHARE_FOLDER := $(shell $(PG_CONFIG) --sharedir)
+SHARE_FOLDER := /usr
 
-CXXFLAGS = -std=c++11 -DSHARE_FOLDER="$(SHARE_FOLDER)"
+CXXFLAGS = -fPIC -std=c++11 -DSHARE_FOLDER="$(SHARE_FOLDER)"
 
 include $(PGXS)
