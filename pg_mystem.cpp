@@ -85,6 +85,8 @@ public:
         
         sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
         if (outQueueSem == SEM_FAILED) {
+            sem_post(inQueueSem);
+            sem_close(inQueueSem);
             elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
             return false;
         }
@@ -150,12 +152,12 @@ public:
         munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
         close(inQueueShm);
         sem_post(inQueueSem);
-        sem_close(inQueueSem);
+//        sem_close(inQueueSem);
         
         munmap((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
         close(outQueueShm);
         sem_post(outQueueSem);
-        sem_close(outQueueSem);
+//        sem_close(outQueueSem);
         
         return true;
     }
@@ -219,7 +221,7 @@ public:
             close(m_inQueueShm);
         }
         if (m_inQueueSem != SEM_FAILED) {
-            sem_post(m_inQueueSem);
+//            sem_post(m_inQueueSem);
             sem_close(m_inQueueSem);
         }
 
@@ -230,7 +232,7 @@ public:
             close(m_outQueueShm);
         }
         if (m_outQueueSem != SEM_FAILED) {
-            sem_post(m_outQueueSem);
+//            sem_post(m_outQueueSem);
             sem_close(m_outQueueSem);
         }
     }
