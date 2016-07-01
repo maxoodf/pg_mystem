@@ -135,12 +135,12 @@ public:
         munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
         close(inQueueShm);
         sem_post(inQueueSem);
-        sem_close(inQueueSem);
+//        sem_close(inQueueSem);
         
         munmap((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
         close(outQueueShm);
         sem_post(outQueueSem);
-        sem_close(outQueueSem);
+//        sem_close(outQueueSem);
         
         return true;
     }
