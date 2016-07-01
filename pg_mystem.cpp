@@ -511,7 +511,10 @@ extern "C" {
     }
 
     static void mainProc(Datum) {
-        inOutQueue_t::init();
+        if (!inOutQueue_t::init()) {
+            elog(ERROR, "MYSTEM: queue initialisation failed");
+            proc_exit(1);
+        }
         
         BackgroundWorker worker;
         worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
