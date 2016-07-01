@@ -82,20 +82,20 @@ public:
             elog(LOG, "MYSTEM: inOutQueue(1) init error = %d, %s", errno, strerror(errno));
             return false;
         }
-        
+/*
         int sval = 0;
         sem_getvalue(inQueueSem, &sval);
         elog(LOG, "MYSTEM: inOutQueue inQueueSem = %d", sval);
-        
+*/
         sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
         if (outQueueSem == SEM_FAILED) {
             elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
             return false;
         }
-        
+/*
         sem_getvalue(outQueueSem, &sval);
         elog(LOG, "MYSTEM: inOutQueue outQueueSem = %d", sval);
-
+*/
         int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_RDWR, 0600);
         if (inQueueShm == -1) {
             elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
@@ -201,14 +201,14 @@ public:
             m_errCode = errno;
             return;
         }
-                
+/*
         int sval = 0;
         sem_getvalue(m_inQueueSem, &sval);
         elog(LOG, "MYSTEM: constructor: m_inQueueSem = %d", sval);
 
         sem_getvalue(m_inQueueSem, &sval);
         elog(LOG, "MYSTEM: constructor: m_outQueueSem = %d", sval);
-
+*/
         m_OK = true;
     }
     
