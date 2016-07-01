@@ -422,84 +422,86 @@ extern "C" {
                 while (!terminated) {
                     std::string writeLine;
                     uint64_t id = inOutQueue.getInQueueRecord(writeLine);
+                    std::string normLine;
                     if (id > 0) {
-                        ssize_t ttl = 0;
-                        while (true) {
-                            ssize_t wrote = write(stdoutPipe[1], writeLine.c_str() + ttl, writeLine.length() - ttl);
-                            if (wrote < 0) {
-                                elog(LOG, "MYSTEM: write to mystem failed");
-                                break;
-                            }
-                            ttl += wrote;
-                            if (wrote == 0 || ttl >= writeLine.length()) {
-                                break;
-                            }
-                        }
-                        
-                        std::vector<std::string> normLines;
-                        std::string readLine;
-                        char rChar = 0;
-                        while (true) {
-                            ssize_t red = read(stdinPipe[0], &rChar, sizeof(rChar));
-                            if (red > 0) {
-                                if (rChar == '\n') {
-                                    if (readLine.find(mystemParagraphEndMarker) != std::string::npos) {
-                                        normLines.push_back(readLine);
-                                        readLine.clear();
-                                        break;
-                                    } else {
-                                        normLines.push_back(readLine);
-                                        readLine.clear();
-                                    }
-                                } else {
-                                    readLine += rChar;
+                        if (writeLine.length() > 0) {
+                            ssize_t ttl = 0;
+                            while (true) {
+                                ssize_t wrote = write(stdoutPipe[1], writeLine.c_str() + ttl, writeLine.length() - ttl);
+                                if (wrote < 0) {
+                                    elog(LOG, "MYSTEM: write to mystem failed");
+                                    break;
                                 }
-                            } else if (red <= 0) {
-                                break;
+                                ttl += wrote;
+                                if (wrote == 0 || ttl >= writeLine.length()) {
+                                    break;
+                                }
                             }
-                        }
-                        
-                        std::string normLine;
-                        for (auto nli:normLines) {
-                            rapidjson::Document jsonDoc;
-                            jsonDoc.Parse<0>(nli.c_str());
-                            if (jsonDoc.IsArray()) {
-                                const rapidjson::Value &array = jsonDoc;
-                                for (rapidjson::SizeType i = 0; i < array.Size(); ++i) {
-                                    std::string anlsStr;
-                                    if (array[i].HasMember("analysis")) {
-                                        if (array[i]["analysis"].IsArray()) {
-                                            const rapidjson::Value &analysis = array[i]["analysis"];
-                                            for (rapidjson::SizeType j = 0; j < analysis.Size(); ++j) {
-                                                if (analysis[j].HasMember("lex")) {
-                                                    anlsStr = analysis[j]["lex"].GetString();
-                                                } else {
-                                                    elog(LOG, "MYSTEM: JSON format error");
-                                                    break;
+                            
+                            std::vector<std::string> normLines;
+                            std::string readLine;
+                            char rChar = 0;
+                            while (true) {
+                                ssize_t red = read(stdinPipe[0], &rChar, sizeof(rChar));
+                                if (red > 0) {
+                                    if (rChar == '\n') {
+                                        if (readLine.find(mystemParagraphEndMarker) != std::string::npos) {
+                                            normLines.push_back(readLine);
+                                            readLine.clear();
+                                            break;
+                                        } else {
+                                            normLines.push_back(readLine);
+                                            readLine.clear();
+                                        }
+                                    } else {
+                                        readLine += rChar;
+                                    }
+                                } else if (red <= 0) {
+                                    break;
+                                }
+                            }
+                            
+                            for (auto nli:normLines) {
+                                rapidjson::Document jsonDoc;
+                                jsonDoc.Parse<0>(nli.c_str());
+                                if (jsonDoc.IsArray()) {
+                                    const rapidjson::Value &array = jsonDoc;
+                                    for (rapidjson::SizeType i = 0; i < array.Size(); ++i) {
+                                        std::string anlsStr;
+                                        if (array[i].HasMember("analysis")) {
+                                            if (array[i]["analysis"].IsArray()) {
+                                                const rapidjson::Value &analysis = array[i]["analysis"];
+                                                for (rapidjson::SizeType j = 0; j < analysis.Size(); ++j) {
+                                                    if (analysis[j].HasMember("lex")) {
+                                                        anlsStr = analysis[j]["lex"].GetString();
+                                                    } else {
+                                                        elog(LOG, "MYSTEM: JSON format error");
+                                                        break;
+                                                    }
                                                 }
+                                            } else {
+                                                elog(LOG, "MYSTEM: JSON format error");
+                                                break;
+                                            }
+                                        }
+                                        if (array[i].HasMember("text")) {
+                                            if (anlsStr.length() == 0) {
+                                                std::string text = array[i]["text"].GetString();
+                                                if (text != mystemParagraphEndMarker && text != "\n") {
+                                                    std::replace(text.begin(), text.end(), '\n', ' ');
+                                                    normLine += text;
+                                                }
+                                            } else {
+                                                normLine += anlsStr;
                                             }
                                         } else {
                                             elog(LOG, "MYSTEM: JSON format error");
                                             break;
                                         }
                                     }
-                                    if (array[i].HasMember("text")) {
-                                        if (anlsStr.length() == 0) {
-                                            std::string text = array[i]["text"].GetString();
-                                            if (text != mystemParagraphEndMarker && text != "\n") {
-                                                std::replace(text.begin(), text.end(), '\n', ' ');
-                                                normLine += text;
-                                            }
-                                        } else {
-                                            normLine += anlsStr;
-                                        }
-                                    } else {
-                                        elog(LOG, "MYSTEM: JSON format error");
-                                        break;
-                                    }
+                                } else {
+                                    elog(LOG, "MYSTEM: JSON parsing failed");
                                 }
-                            } else {
-                                elog(LOG, "MYSTEM: JSON parsing failed");
                             }
                         }
                         
