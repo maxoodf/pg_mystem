@@ -411,7 +411,6 @@ extern "C" {
                     uint64_t id = inOutQueue.getInQueueRecord(line);
                     if (id > 0) {
                         ssize_t ttl = 0;
-                        elog(LOG, "MYSTEM: 1 %llu, %s", id, line.c_str());
                         while (true) {
                             ssize_t wrote = write(stdoutPipe[1], line.c_str() + ttl, line.length() - ttl);
                             if (wrote < 0) {
@@ -420,12 +419,10 @@ extern "C" {
                             }
                             ttl += wrote;
                             if (wrote == 0 || ttl >= line.length()) {
-                                elog(LOG, "MYSTEM: 2");
                                 break;
                             }
                         }
                         
-                        elog(LOG, "MYSTEM: 3");
                         std::vector<std::string> normLines;
                         line.clear();
                         char rChar = 0;
@@ -434,12 +431,10 @@ extern "C" {
                             if (red > 0) {
                                 if (rChar == '\n') {
                                     if (line.find(mystemParagraphEndMarker) != std::string::npos) {
-                                        elog(LOG, "MYSTEM: 3.1");
                                         normLines.push_back(line);
                                         line.clear();
                                         break;
                                     } else {
-                                        elog(LOG, "MYSTEM: 4");
                                         normLines.push_back(line);
                                         line.clear();
                                     }
@@ -447,32 +442,23 @@ extern "C" {
                                     line += rChar;
                                 }
                             } else if (red <= 0) {
-                                elog(LOG, "MYSTEM: read from mystem failed");
                                 break;
                             }
                         }
                         
-                        elog(LOG, "MYSTEM: 6 %s", line.c_str());
                         std::string normLine;
                         for (auto nli:normLines) {
                             rapidjson::Document jsonDoc;
                             jsonDoc.Parse<0>(nli.c_str());
-                            elog(LOG, "MYSTEM: 7");
                             if (jsonDoc.IsArray()) {
-                                elog(LOG, "MYSTEM: 8");
                                 const rapidjson::Value &array = jsonDoc;
                                 for (rapidjson::SizeType i = 0; i < array.Size(); ++i) {
-                                    elog(LOG, "MYSTEM: 9");
                                     std::string anlsStr;
                                     if (array[i].HasMember("analysis")) {
-                                        elog(LOG, "MYSTEM: 10");
                                         if (array[i]["analysis"].IsArray()) {
-                                            elog(LOG, "MYSTEM: 11");
                                             const rapidjson::Value &analysis = array[i]["analysis"];
                                             for (rapidjson::SizeType j = 0; j < analysis.Size(); ++j) {
-                                                elog(LOG, "MYSTEM: 12");
                                                 if (analysis[j].HasMember("lex")) {
-                                                    elog(LOG, "MYSTEM: 13");
                                                     anlsStr = analysis[j]["lex"].GetString();
                                                 } else {
                                                     elog(LOG, "MYSTEM: JSON format error");
@@ -484,19 +470,14 @@ extern "C" {
                                             break;
                                         }
                                     }
-                                    elog(LOG, "MYSTEM: 14");
                                     if (array[i].HasMember("text")) {
-                                        elog(LOG, "MYSTEM: 15");
                                         if (anlsStr.length() == 0) {
-                                            elog(LOG, "MYSTEM: 16");
                                             std::string text = array[i]["text"].GetString();
                                             if (text != mystemParagraphEndMarker && text != "\n") {
-                                                elog(LOG, "MYSTEM: 17");
                                                 std::replace(text.begin(), text.end(), '\n', ' ');
                                                 normLine += text;
                                             }
                                         } else {
-                                            elog(LOG, "MYSTEM: 18");
                                             normLine += anlsStr;
                                         }
                                     } else {
@@ -509,14 +490,10 @@ extern "C" {
                             }
                         }
                         
-
-                        elog(LOG, "MYSTEM: 19");
                         while (true) {
                             if (inOutQueue.setOutQueueRecord(id, normLine)) {
-                                elog(LOG, "MYSTEM: 20");
                                 break;
                             } else {
-                                elog(LOG, "MYSTEM: 21");
                                 usleep(10000);
                             }
                         }
@@ -589,40 +566,33 @@ extern "C" {
         
         text *_line = PG_GETARG_TEXT_P(0);
         std::string line(VARDATA(_line), VARSIZE(_line) - VARHDRSZ);
+
         std::string nrmLine;
+        if (line.length() > 0) {
+            inOutQueue_t inOutQueue;
+            if (!inOutQueue.isOK()) {
+                PG_RETURN_NULL();
+            }
+            
+            uint64_t id = 0;
+            while (true) {
+                id = inOutQueue.setInQueueRecord(line);
+                if (id != 0) {
+                    break;
+                } else {
+                    usleep(10000);
+                }
+            }
+            
+            while (true) {
+                if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
+                    break;
+                } else {
+                    usleep(10000);
+                }
+            }
+        }
 
-	if (line.length() > 0) {        
-    	    inOutQueue_t inOutQueue;
-    	    if (!inOutQueue.isOK()) {
-        	PG_RETURN_NULL();
-    	    }
-
-    	    uint64_t id = 0;
-    	    while (true) {
-        	id = inOutQueue.setInQueueRecord(line);
-        	if (id != 0) {
-            	    break;
-        	} else {
-            	    usleep(10000);
-        	}
-    	    }
-        
-    	    while (true) {
-        	if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
-            	    break;
-        	} else {
-            	    usleep(10000);
-        	}
-    	    }
-	}
-/*
-        std::size_t retLen = nrmLine.length();
-        text *ret = (text *) palloc(retLen);
-        SET_VARSIZE(ret, retLen);
-        memcpy(VARDATA(ret), nrmLine.c_str(), retLen);
-        
-        PG_RETURN_TEXT_P(ret);
-*/
         PG_RETURN_TEXT_P(cstring_to_text(nrmLine.c_str()));
     }
 }
