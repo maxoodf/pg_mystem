@@ -407,39 +407,39 @@ extern "C" {
                 elog(LOG, "MYSTEM: initialized");
                 
                 while (!terminated) {
-                    std::string line;
-                    uint64_t id = inOutQueue.getInQueueRecord(line);
+                    std::string writeLine;
+                    uint64_t id = inOutQueue.getInQueueRecord(writeLine);
                     if (id > 0) {
                         ssize_t ttl = 0;
                         while (true) {
-                            ssize_t wrote = write(stdoutPipe[1], line.c_str() + ttl, line.length() - ttl);
+                            ssize_t wrote = write(stdoutPipe[1], writeLine.c_str() + ttl, writeLine.length() - ttl);
                             if (wrote < 0) {
                                 elog(LOG, "MYSTEM: write to mystem failed");
                                 break;
                             }
                             ttl += wrote;
-                            if (wrote == 0 || ttl >= line.length()) {
+                            if (wrote == 0 || ttl >= writeLine.length()) {
                                 break;
                             }
                         }
                         
                         std::vector<std::string> normLines;
-                        line.clear();
+                        std::string readLine;
                         char rChar = 0;
                         while (true) {
                             ssize_t red = read(stdinPipe[0], &rChar, sizeof(rChar));
                             if (red > 0) {
                                 if (rChar == '\n') {
-                                    if (line.find(mystemParagraphEndMarker) != std::string::npos) {
-                                        normLines.push_back(line);
-                                        line.clear();
+                                    if (readLine.find(mystemParagraphEndMarker) != std::string::npos) {
+                                        normLines.push_back(readLine);
+                                        readLine.clear();
                                         break;
                                     } else {
-                                        normLines.push_back(line);
-                                        line.clear();
+                                        normLines.push_back(readLine);
+                                        readLine.clear();
                                     }
                                 } else {
-                                    line += rChar;
+                                    readLine += rChar;
                                 }
                             } else if (red <= 0) {
                                 break;
