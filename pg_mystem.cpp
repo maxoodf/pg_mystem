@@ -29,7 +29,7 @@ extern "C" {
 #ifndef DOC_LEN_MAX
     #error "DOC_LEN_MAX must be defined"
 #else
-    static const uint32_t lineLengthMax = DOC_LEN_MAX;
+    static const uint32_t docLengthMax = DOC_LEN_MAX;
 #endif
 
 #ifndef MYSTEM_PROCS
@@ -40,17 +40,20 @@ extern "C" {
 
 static const std::string mystemParagraphEndMarker = "EndOfArticleMarker";
 
+// document[DOC_LEN_MAX] + ' ' + "EndOfArticleMarker" + '\n' + '\0'
+static const uint32_t docAndPostfixLengthMax = docLengthMax + 21 * sizeof(char);
+
 class inOutQueue_t {
 public:
     static const uint16_t queueRecordsMax;
     
     struct inQueueRecord_t {
         uint64_t m_id;
-        char m_text[lineLengthMax + 1];
+        char m_text[docAndPostfixLengthMax];
     };
     struct outQueueRecord_t {
         uint64_t m_id;
-        char m_text[lineLengthMax + 1];
+        char m_text[docAndPostfixLengthMax];
     };
     
 private:
@@ -255,13 +258,13 @@ public:
                     ret = m_inQueue[i].m_id = dis(gen);
 
                     std::string text = _text;
-                    if (text.length() > lineLengthMax - mystemParagraphEndMarker.length() - 2) {
-                        text = text.substr(0, lineLengthMax - mystemParagraphEndMarker.length() - 2);
+                    if (text.length() > docLengthMax) {
+                        text = text.substr(0, docLengthMax);
                     }
                     strncpy(m_inQueue[i].m_text,
                             (text + " " + mystemParagraphEndMarker + "\n").c_str(),
-                            lineLengthMax);
-                    m_inQueue[i].m_text[lineLengthMax] = 0;
+                            docAndPostfixLengthMax - 1);
+                    m_inQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
                     break;
                 }
             }
@@ -296,13 +299,13 @@ public:
                 if (m_outQueue[i].m_id == 0) {
                     m_outQueue[i].m_id = _id;
                     std::string text = _text;
-                    if (text.length() > lineLengthMax - 1) {
-                        text = text.substr(0, lineLengthMax - 1);
+                    if (text.length() > docAndPostfixLengthMax - 2) {
+                        text = text.substr(0, docAndPostfixLengthMax - 2);
                     }
                     strncpy(m_outQueue[i].m_text,
                             (text + "\n").c_str(),
-                            lineLengthMax);
-                    m_outQueue[i].m_text[lineLengthMax] = 0;
+                            docAndPostfixLengthMax - 1);
+                    m_outQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
                     ret = true;
                     break;
                 }
