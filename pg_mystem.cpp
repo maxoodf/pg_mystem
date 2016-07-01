@@ -77,25 +77,32 @@ private:
     
 public:
     static bool init() {
-        sem_t *inQueueSem = sem_open(inQueueSemName, O_CREAT | O_EXCL, 0600, 0);
+        sem_t *inQueueSem = sem_open(inQueueSemName, O_CREAT, 0600, 0);
         if (inQueueSem == SEM_FAILED) {
             elog(LOG, "MYSTEM: inOutQueue(1) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
-        sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT | O_EXCL, 0600, 0);
+        int sval = 0;
+        sem_getvalue(inQueueSem, &sval);
+        elog(LOG, "MYSTEM: inOutQueue(1) sem_getvalue = %d", sval);
+        
+        sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
         if (outQueueSem == SEM_FAILED) {
             elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
-        int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_EXCL | O_RDWR, 0600);
+        sem_getvalue(outQueueSem, &sval);
+        elog(LOG, "MYSTEM: inOutQueue(1) sem_getvalue = %d", sval);
+
+        int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_RDWR, 0600);
         if (inQueueShm == -1) {
             elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
-        int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_EXCL | O_RDWR), 0600);
+        int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_RDWR), 0600);
         if (outQueueShm == -1) {
             elog(LOG, "MYSTEM: inOutQueue(4) init error = %d, %s", errno, strerror(errno));
             return false;
