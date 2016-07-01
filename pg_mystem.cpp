@@ -77,41 +77,30 @@ private:
     
 public:
     static bool init() {
-        sem_t *inQueueSem = sem_open(inQueueSemName, O_CREAT, 0600, 0);
+        sem_t *inQueueSem = sem_open(inQueueSemName, O_CREAT | O_EXCL, 0600, 0);
         if (inQueueSem == SEM_FAILED) {
             elog(LOG, "MYSTEM: inOutQueue(1) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
-        sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
+        sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT | O_EXCL, 0600, 0);
         if (outQueueSem == SEM_FAILED) {
-            sem_post(inQueueSem);
-            sem_close(inQueueSem);
             elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
-        int inQueueShm = shm_open(inQueueShmName, (O_CREAT | O_RDWR), 0600);
+        int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_EXCL | O_TRUNC | O_RDWR, 0600);
         if (inQueueShm == -1) {
-            sem_post(inQueueSem);
-            sem_close(inQueueSem);
-            sem_post(outQueueSem);
-            sem_close(outQueueSem);
             elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
-        int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_RDWR), 0600);
+        int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_EXCL | O_TRUNC | O_RDWR), 0600);
         if (outQueueShm == -1) {
-            sem_post(inQueueSem);
-            sem_close(inQueueSem);
-            close(inQueueShm);
-            sem_post(outQueueSem);
-            sem_close(outQueueSem);
             elog(LOG, "MYSTEM: inOutQueue(4) init error = %d, %s", errno, strerror(errno));
             return false;
         }
-        
+/*
         if (ftruncate(inQueueShm, (off_t) sizeof(inQueueRecord_t) * queueRecordsMax) != 0) {
             elog(LOG, "MYSTEM: inOutQueue(5) init error = %d, %s", errno, strerror(errno));
         }
@@ -119,29 +108,16 @@ public:
         if (ftruncate(outQueueShm, (off_t) sizeof(outQueueRecord_t) * queueRecordsMax) != 0) {
             elog(LOG, "MYSTEM: inOutQueue(6) init error = %d, %s", errno, strerror(errno));
         }
-        
+*/
         inQueueRecord_t *inQueue = (inQueueRecord_t *) mmap((void *) 0, sizeof(inQueueRecord_t) * queueRecordsMax,
                                  PROT_WRITE, MAP_SHARED, inQueueShm, (off_t) 0);
         if (inQueue == MAP_FAILED) {
-            sem_post(inQueueSem);
-            sem_close(inQueueSem);
-            close(inQueueShm);
-            sem_post(outQueueSem);
-            sem_close(outQueueSem);
-            close(outQueueShm);
             elog(LOG, "MYSTEM: inOutQueue(7) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         outQueueRecord_t *outQueue = (outQueueRecord_t *) mmap((void *) 0, sizeof(outQueueRecord_t) * queueRecordsMax,
                                   PROT_WRITE, MAP_SHARED, outQueueShm, (off_t) 0);
         if (outQueue == MAP_FAILED) {
-            sem_post(inQueueSem);
-            sem_close(inQueueSem);
-            munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
-            close(inQueueShm);
-            sem_post(outQueueSem);
-            sem_close(outQueueSem);
-            close(outQueueShm);
             elog(LOG, "MYSTEM: inOutQueue(8) init error = %d, %s", errno, strerror(errno));
             return false;
         }
@@ -152,22 +128,31 @@ public:
         munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
         close(inQueueShm);
         sem_post(inQueueSem);
-//        sem_close(inQueueSem);
+        sem_close(inQueueSem);
         
         munmap((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
         close(outQueueShm);
         sem_post(outQueueSem);
-//        sem_close(outQueueSem);
+        sem_close(outQueueSem);
         
         return true;
     }
     
     static void release() {
-        sem_unlink(inQueueShmName);
-        shm_unlink(inQueueSemName);
+/*
+        sem_post(inQueueSem);
+        sem_close(inQueueSem);
+        munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
+        close(inQueueShm);
+        sem_post(outQueueSem);
+        sem_close(outQueueSem);
+        close(outQueueShm);
+*/
+        sem_unlink(inQueueSemName);
+        shm_unlink(inQueueShmName);
         
-        sem_unlink(outQueueShmName);
-        shm_unlink(outQueueSemName);
+        sem_unlink(outQueueSemName);
+        shm_unlink(outQueueShmName);
     }
 
     inOutQueue_t(): m_inQueueSem(SEM_FAILED), m_outQueueSem(SEM_FAILED), m_inQueueShm(-1), m_outQueueShm(-1),
@@ -221,7 +206,6 @@ public:
             close(m_inQueueShm);
         }
         if (m_inQueueSem != SEM_FAILED) {
-//            sem_post(m_inQueueSem);
             sem_close(m_inQueueSem);
         }
 
@@ -232,7 +216,6 @@ public:
             close(m_outQueueShm);
         }
         if (m_outQueueSem != SEM_FAILED) {
-//            sem_post(m_outQueueSem);
             sem_close(m_outQueueSem);
         }
     }
