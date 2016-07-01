@@ -65,12 +65,16 @@ private:
 public:
     static bool init() {
         sem_t *inQueueSem = sem_open(inQueueSemName, O_CREAT, 0600, 0);
-        if (inQueueSem == SEM_FAILED)
+        if (inQueueSem == SEM_FAILED) {
+            elog(LOG, "MYSTEM: inOutQueue(1) init error = %d, %s", errno, strerror(errno));
             return false;
+        }
         
         sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
-        if (outQueueSem == SEM_FAILED)
+        if (outQueueSem == SEM_FAILED) {
+            elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
             return false;
+        }
         
         int inQueueShm = shm_open(inQueueShmName, (O_CREAT | O_RDWR), 0600);
         if (inQueueShm == -1) {
@@ -78,7 +82,7 @@ public:
             sem_close(inQueueSem);
             sem_post(outQueueSem);
             sem_close(outQueueSem);
-            
+            elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
@@ -89,13 +93,16 @@ public:
             close(inQueueShm);
             sem_post(outQueueSem);
             sem_close(outQueueSem);
+            elog(LOG, "MYSTEM: inOutQueue(4) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
         if (ftruncate(inQueueShm, (off_t) sizeof(inQueueRecord_t) * queueRecordsMax) != 0) {
+            elog(LOG, "MYSTEM: inOutQueue(5) init error = %d, %s", errno, strerror(errno));
         }
         
         if (ftruncate(outQueueShm, (off_t) sizeof(outQueueRecord_t) * queueRecordsMax) != 0) {
+            elog(LOG, "MYSTEM: inOutQueue(6) init error = %d, %s", errno, strerror(errno));
         }
         
         inQueueRecord_t *inQueue = (inQueueRecord_t *) mmap((void *) 0, sizeof(inQueueRecord_t) * queueRecordsMax,
@@ -107,6 +114,7 @@ public:
             sem_post(outQueueSem);
             sem_close(outQueueSem);
             close(outQueueShm);
+            elog(LOG, "MYSTEM: inOutQueue(7) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         outQueueRecord_t *outQueue = (outQueueRecord_t *) mmap((void *) 0, sizeof(outQueueRecord_t) * queueRecordsMax,
@@ -119,6 +127,7 @@ public:
             sem_post(outQueueSem);
             sem_close(outQueueSem);
             close(outQueueShm);
+            elog(LOG, "MYSTEM: inOutQueue(8) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
