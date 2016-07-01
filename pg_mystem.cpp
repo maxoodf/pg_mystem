@@ -89,18 +89,18 @@ public:
             return false;
         }
         
-        int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_EXCL | O_TRUNC | O_RDWR, 0600);
+        int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_EXCL | O_RDWR, 0600);
         if (inQueueShm == -1) {
             elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
             return false;
         }
         
-        int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_EXCL | O_TRUNC | O_RDWR), 0600);
+        int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_EXCL | O_RDWR), 0600);
         if (outQueueShm == -1) {
             elog(LOG, "MYSTEM: inOutQueue(4) init error = %d, %s", errno, strerror(errno));
             return false;
         }
-/*
+
         if (ftruncate(inQueueShm, (off_t) sizeof(inQueueRecord_t) * queueRecordsMax) != 0) {
             elog(LOG, "MYSTEM: inOutQueue(5) init error = %d, %s", errno, strerror(errno));
         }
@@ -108,7 +108,7 @@ public:
         if (ftruncate(outQueueShm, (off_t) sizeof(outQueueRecord_t) * queueRecordsMax) != 0) {
             elog(LOG, "MYSTEM: inOutQueue(6) init error = %d, %s", errno, strerror(errno));
         }
-*/
+
         inQueueRecord_t *inQueue = (inQueueRecord_t *) mmap((void *) 0, sizeof(inQueueRecord_t) * queueRecordsMax,
                                  PROT_WRITE, MAP_SHARED, inQueueShm, (off_t) 0);
         if (inQueue == MAP_FAILED) {
