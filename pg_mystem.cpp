@@ -144,12 +144,8 @@ public:
             return false;
         }
         
-        for (auto i = 0; i < queueRecordsMax; ++i) {
-            inQueue[i].m_text[0] = 0;
-            
-            outQueue[i].m_id = 0;
-            outQueue[i].m_text[0] = 0;
-        }
+        bzero((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
+        bzero((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
         
         munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
         close(inQueueShm);
@@ -264,7 +260,7 @@ public:
                     strncpy(m_inQueue[i].m_text,
                             (text + " " + mystemParagraphEndMarker + "\n").c_str(),
                             docAndPostfixLengthMax - 1);
-                    m_inQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
+//                    m_inQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
                     break;
                 }
             }
@@ -282,7 +278,7 @@ public:
                     ret = m_inQueue[i].m_id;
                     m_inQueue[i].m_id = 0;
                     _text = m_inQueue[i].m_text;
-                    m_inQueue[i].m_text[0] = 0;
+                    bzero((void *) m_inQueue[i].m_text[0], docAndPostfixLengthMax);
                     break;
                 }
             }
@@ -305,7 +301,7 @@ public:
                     strncpy(m_outQueue[i].m_text,
                             (text + "\n").c_str(),
                             docAndPostfixLengthMax - 1);
-                    m_outQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
+//                    m_outQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
                     ret = true;
                     break;
                 }
@@ -323,7 +319,7 @@ public:
                 if (m_outQueue[i].m_id == _id) {
                     m_outQueue[i].m_id = 0;
                     _text = m_outQueue[i].m_text;
-                    m_outQueue[i].m_text[0] = 0;
+                    bzero((void *) m_outQueue[i].m_text[0], docAndPostfixLengthMax);
                     ret = true;
                     break;
                 }
