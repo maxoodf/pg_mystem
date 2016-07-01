@@ -278,7 +278,7 @@ public:
                     ret = m_inQueue[i].m_id;
                     m_inQueue[i].m_id = 0;
                     _text = m_inQueue[i].m_text;
-                    bzero((void *) m_inQueue[i].m_text[0], docAndPostfixLengthMax);
+                    bzero((void *) m_inQueue[i].m_text, docAndPostfixLengthMax);
                     break;
                 }
             }
@@ -319,7 +319,7 @@ public:
                 if (m_outQueue[i].m_id == _id) {
                     m_outQueue[i].m_id = 0;
                     _text = m_outQueue[i].m_text;
-                    bzero((void *) m_outQueue[i].m_text[0], docAndPostfixLengthMax);
+                    bzero((void *) m_outQueue[i].m_text, docAndPostfixLengthMax);
                     ret = true;
                     break;
                 }
