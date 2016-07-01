@@ -6,7 +6,9 @@ MODULES = pg_mystem
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 SHARE_FOLDER := $(shell $(PG_CONFIG) --sharedir)
+DOC_LEN_MAX := 65536
+MYSTEM_PROCS := 8
 
-CXXFLAGS = -fPIC -std=c++11 -DSHARE_FOLDER="$(SHARE_FOLDER)"
+CXXFLAGS = -fPIC -fpic -std=c++11 -DSHARE_FOLDER="$(SHARE_FOLDER)" -DDOC_LEN_MAX=$(DOC_LEN_MAX) -DMYSTEM_PROCS=$(MYSTEM_PROCS)
 
 include $(PGXS)

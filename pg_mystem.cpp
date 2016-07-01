@@ -26,9 +26,19 @@ extern "C" {
     PG_MODULE_MAGIC;
 }
 
-static const uint8_t mystemProcNo = 6;
+#ifndef DOC_LEN_MAX
+    #error "DOC_LEN_MAX must be defined"
+#else
+    static const uint32_t lineLengthMax = DOC_LEN_MAX;
+#endif
+
+#ifndef MYSTEM_PROCS
+    #error "MYSTEM_PROCS must be defined"
+#else
+    static const uint8_t mystemProcNo = MYSTEM_PROCS;
+#endif
+
 static const std::string mystemParagraphEndMarker = "EndOfArticleMarker";
-static const uint16_t lineLengthMax = 65536 - sizeof(char) - sizeof(uint64_t);
 
 class inOutQueue_t {
 public:
