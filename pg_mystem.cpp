@@ -241,7 +241,7 @@ public:
                 if (m_inQueue[i].m_id == 0) {
                     std::random_device rd;
                     std::mt19937 gen(rd());
-                    std::uniform_int_distribution<> dis(0, std::numeric_limits<uint32_t>::max());
+                    std::uniform_int_distribution<> dis(0, std::numeric_limits<int>::max());
                     ret = m_inQueue[i].m_id = dis(gen);
 
                     std::string text = _text;
@@ -326,10 +326,10 @@ private:
 };
 
 const uint16_t inOutQueue_t::queueRecordsMax = mystemProcNo * 2;
-const char *inOutQueue_t::inQueueSemName = "/tmp/pg_mystemInQueueSem";
-const char *inOutQueue_t::inQueueShmName = "/tmp/pg_mystemInQueueShm";
-const char *inOutQueue_t::outQueueSemName = "/tmp/pg_mystemOutQueueSem";
-const char *inOutQueue_t::outQueueShmName = "/tmp/pg_mystemOutQueueShm";
+const char *inOutQueue_t::inQueueSemName = "/pg_mystemInQueueSem";
+const char *inOutQueue_t::inQueueShmName = "/pg_mystemInQueueShm";
+const char *inOutQueue_t::outQueueSemName = "/pg_mystemOutQueueSem";
+const char *inOutQueue_t::outQueueShmName = "/pg_mystemOutQueueShm";
 
 extern "C" {
     static volatile sig_atomic_t terminated = false;
@@ -380,7 +380,7 @@ extern "C" {
                 
                 // if we get here at all, an error occurred, but we are in the child
                 // process, so just exit
-                elog(ERROR, "MYSTEM: exec of the child process failed, errno=%d", errno);
+                elog(ERROR, "MYSTEM: exec of the child process failed (%s), errno = %d", path.c_str(), errno);
                 proc_exit(1);
             } case -1: {
                 // failed to create child
@@ -584,37 +584,37 @@ extern "C" {
     PG_FUNCTION_INFO_V1(mystem_convert);
     Datum mystem_convert(PG_FUNCTION_ARGS) {
         if(PG_ARGISNULL(0)) {
-            elog(ERROR, "MYSTEM: NULL INPUT DATA");
             PG_RETURN_NULL();
         }
         
         text *_line = PG_GETARG_TEXT_P(0);
         std::string line(VARDATA(_line), VARSIZE(_line) - VARHDRSZ);
-        
-        inOutQueue_t inOutQueue;
-        if (!inOutQueue.isOK()) {
-            elog(ERROR, "MYSTEM: failed to attach queue, %s", strerror(inOutQueue.errCode()));
-            PG_RETURN_NULL();
-        }
-
-        uint64_t id = 0;
-        while (true) {
-            id = inOutQueue.setInQueueRecord(line);
-            if (id != 0) {
-                break;
-            } else {
-                usleep(10000);
-            }
-        }
-        
         std::string nrmLine;
-        while (true) {
-            if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
-                break;
-            } else {
-                usleep(10000);
-            }
-        }
+
+	if (line.length() > 0) {        
+    	    inOutQueue_t inOutQueue;
+    	    if (!inOutQueue.isOK()) {
+        	PG_RETURN_NULL();
+    	    }
+
+    	    uint64_t id = 0;
+    	    while (true) {
+        	id = inOutQueue.setInQueueRecord(line);
+        	if (id != 0) {
+            	    break;
+        	} else {
+            	    usleep(10000);
+        	}
+    	    }
+        
+    	    while (true) {
+        	if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
+            	    break;
+        	} else {
+            	    usleep(10000);
+        	}
+    	    }
+	}
 /*
         std::size_t retLen = nrmLine.length();
         text *ret = (text *) palloc(retLen);
