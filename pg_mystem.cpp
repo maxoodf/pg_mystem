@@ -43,6 +43,8 @@ static const std::string mystemParagraphEndMarker = "EndOfArticleMarker";
 // document[DOC_LEN_MAX] + ' ' + "EndOfArticleMarker" + '\n' + '\0'
 static const uint32_t docAndPostfixLengthMax = docLengthMax + 21 * sizeof(char);
 
+static const useconds_t queueWaitTimeout = 1000; // wait for a record, microseconds
+
 class inOutQueue_t {
 public:
     static const uint16_t queueRecordsMax;
@@ -82,20 +84,13 @@ public:
             elog(LOG, "MYSTEM: inOutQueue(1) init error = %d, %s", errno, strerror(errno));
             return false;
         }
-/*
-        int sval = 0;
-        sem_getvalue(inQueueSem, &sval);
-        elog(LOG, "MYSTEM: inOutQueue inQueueSem = %d", sval);
-*/
+        
         sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
         if (outQueueSem == SEM_FAILED) {
             elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
             return false;
         }
-/*
-        sem_getvalue(outQueueSem, &sval);
-        elog(LOG, "MYSTEM: inOutQueue outQueueSem = %d", sval);
-*/
+
         int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_RDWR, 0600);
         if (inQueueShm == -1) {
             elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
@@ -135,26 +130,15 @@ public:
         munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
         close(inQueueShm);
         sem_post(inQueueSem);
-//        sem_close(inQueueSem);
         
         munmap((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
         close(outQueueShm);
         sem_post(outQueueSem);
-//        sem_close(outQueueSem);
         
         return true;
     }
     
     static void release() {
-/*
-        sem_post(inQueueSem);
-        sem_close(inQueueSem);
-        munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
-        close(inQueueShm);
-        sem_post(outQueueSem);
-        sem_close(outQueueSem);
-        close(outQueueShm);
-*/
         sem_unlink(inQueueSemName);
         shm_unlink(inQueueShmName);
         
@@ -201,14 +185,7 @@ public:
             m_errCode = errno;
             return;
         }
-/*
-        int sval = 0;
-        sem_getvalue(m_inQueueSem, &sval);
-        elog(LOG, "MYSTEM: constructor: m_inQueueSem = %d", sval);
 
-        sem_getvalue(m_inQueueSem, &sval);
-        elog(LOG, "MYSTEM: constructor: m_outQueueSem = %d", sval);
-*/
         m_OK = true;
     }
     
@@ -259,7 +236,6 @@ public:
                     strncpy(m_inQueue[i].m_text,
                             (text + " " + mystemParagraphEndMarker + "\n").c_str(),
                             docAndPostfixLengthMax - 1);
-//                    m_inQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
                     break;
                 }
             }
@@ -300,7 +276,6 @@ public:
                     strncpy(m_outQueue[i].m_text,
                             (text + "\n").c_str(),
                             docAndPostfixLengthMax - 1);
-//                    m_outQueue[i].m_text[docAndPostfixLengthMax - 1] = 0;
                     ret = true;
                     break;
                 }
@@ -504,7 +479,7 @@ extern "C" {
                             if (inOutQueue.setOutQueueRecord(id, normLine)) {
                                 break;
                             } else {
-                                usleep(10000);
+                                usleep(queueWaitTimeout);
                             }
                         }
                     }
@@ -545,7 +520,7 @@ extern "C" {
         BackgroundWorkerUnblockSignals();
 
         while (!terminated) {
-            int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 10000L);
+            int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, queueWaitTimeout);
             ResetLatch(MyLatch);
             if (rc & WL_POSTMASTER_DEATH) {
                 break;
@@ -593,7 +568,7 @@ extern "C" {
                 if (id != 0) {
                     break;
                 } else {
-                    usleep(10000);
+                    usleep(queueWaitTimeout);
                 }
             }
             
@@ -601,7 +576,7 @@ extern "C" {
                 if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
                     break;
                 } else {
-                    usleep(10000);
+                    usleep(queueWaitTimeout);
                 }
             }
         }
