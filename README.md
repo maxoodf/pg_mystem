@@ -30,17 +30,17 @@ $ sudo make install
 
 pg_mystem Configuration
 ============
-You may wish to change pg_mystem default settings. All need is to change Makefile defined parameters - 
+You may wish to change pg_mystem default settings. All you need is to change Makefile defined parameters - 
 
 1. `DOC_LEN_MAX` - maximal document (string) length. If you work with a short lines, redefine `DOC_LEN_MAX` to 1000 chars or so. If you work with a big documents, redefine `DOC_LEN_MAX` to 100000 or so.
 
 2. `MYSTEM_PROCS` - how many Mystem processes to run. I use the following value in my projects - one Mystem process throughput is about 6 KB/sec. So if I need to process, say 30-35 KB of text in a second I use 6 Mystem processes.
 
-You will need to reinstall pg_mystem in case any of these parameters is changed.
+You will need to reinstall `pg_mystem` in case any of these parameters is changed.
 
 pg_mystem Extension registration
 ============
-1. Edit your postgresql.conf.
+1. Edit your `postgresql.conf`.
 Add the following line - 
 `shared_preload_libraries = 'pg_mystem'`
 Also you may need to change `max_worker_processes` to `MYSTEM_PROCS` + 1 at least. For example -
