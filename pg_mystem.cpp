@@ -400,7 +400,7 @@ extern "C" {
                     std::string normLine;
                     if (id > 0) {
                         if (writeLine.length() > 0) {
-                            ssize_t ttl = 0;
+                            std::size_t ttl = 0;
                             while (true) {
                                 ssize_t wrote = write(stdoutPipe[1], writeLine.c_str() + ttl, writeLine.length() - ttl);
                                 if (wrote < 0) {
