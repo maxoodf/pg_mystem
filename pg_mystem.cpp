@@ -231,7 +231,13 @@ public:
 
                     std::string text = _text;
                     if (text.length() > docLengthMax) {
-                        text = text.substr(0, docLengthMax);
+                        const char delimChars[] = " .,!@#$%^&*()_-+={[}];:'\"~`<>?/\n\t";
+                        std::size_t pos = text.find_last_of(delimChars, docLengthMax - 1, 1);
+                        if (pos == std::string::npos) {
+                            pos = docLengthMax - 1;
+                        }
+                        elog(LOG, "MYSTEM: pos = %lu", pos);
+                        text = text.substr(0, pos + 1);
                     }
                     strncpy(m_inQueue[i].m_text,
                             (text + " " + mystemParagraphEndMarker + "\n").c_str(),
