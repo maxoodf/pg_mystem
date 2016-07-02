@@ -1,18 +1,18 @@
 pg_mystem - PostgreSQL extension for Yandex Mystem.
 ============
 
-pg_mystem is an implementation of the PostgreSQL extension for Yandex Mystem (morphology analyzer/stemmer for Russian language).
+`pg_mystem` is an implementation of the `PostgreSQL` extension for Yandex `mystem` (morphology analyzer/stemmer for Russian language).
 
-Read more about PostgreSQL extensions here -  https://www.postgresql.org/docs/9.5/static/extend-extensions.html and here - https://www.postgresql.org/docs/9.5/static/extend-pgxs.html
+Read more about `PostgreSQL` extensions here -  https://www.postgresql.org/docs/9.5/static/extend-extensions.html and here - https://www.postgresql.org/docs/9.5/static/extend-pgxs.html
 
-Read more about Yandex Mystem - https://tech.yandex.ru/mystem/
+Read more about Yandex `mystem` - https://tech.yandex.ru/mystem/
 
-What is the extension function? You can use the power of Mystem inside your PostgreSQL database.
+What is the extension function? You can use the power of `mystem` inside your `PostgreSQL` database.
 
-Yandex Mystem Installation
+Yandex mystem Installation
 ============
-You can download binary file from https://tech.yandex.ru/mystem/ and install it to the PostgreSQL share directory. 
-For example:
+Download binary file from https://tech.yandex.ru/mystem/ and install it to the `PostgreSQL` share directory. 
+Example:
 ```bash
 $ wget http://download.cdn.yandex.net/mystem/mystem-3.0-linux3.1-64bit.tar.gz
 $ tar xfz mystem-3.0-linux3.1-64bit.tar.gz
@@ -30,11 +30,11 @@ $ sudo make install
 
 pg_mystem Configuration
 ============
-You may wish to change pg_mystem default settings. All you need is to change Makefile defined parameters - 
+You may wish to change `pg_mystem` default settings. All you need is to change Makefile defined parameters - 
 
-1. `DOC_LEN_MAX` - maximal document (string) length. If you work with a short lines, redefine `DOC_LEN_MAX` to 1000 chars or so. If you work with a big documents, redefine `DOC_LEN_MAX` to 100000 or so.
+1. `DOC_LEN_MAX` - maximum document (string) length. If you work with a short lines, redefine `DOC_LEN_MAX` to 1000 chars or so. If you work with a large documents, redefine `DOC_LEN_MAX` to 100000 characters or so.
 
-2. `MYSTEM_PROCS` - how many Mystem processes to run. I use the following value in my projects - one Mystem process throughput is about 6 KB/sec. So if I need to process, say 30-35 KB of text in a second I use 6 Mystem processes.
+2. `MYSTEM_PROCS` - how many `mystem` processes to run. I use the following value in my projects - one `mystem` process throughput is about 6 KB/sec. So if I need to process, say 30-35 KB of text in a second I use 6 `mystem` processes.
 
 You will need to reinstall `pg_mystem` in case any of these parameters is changed.
 
@@ -43,10 +43,12 @@ pg_mystem Extension registration
 1. Edit your `postgresql.conf`.
 Add the following line - 
 `shared_preload_libraries = 'pg_mystem'`
-Also you may need to change `max_worker_processes` to `MYSTEM_PROCS` + 1 at least. For example -
+Also you may need to change `max_worker_processes` to `MYSTEM_PROCS` + 1 at least. 
+Example -
 `max_worker_processes = 24`
 
-2. Execute the following query inside your database, for example -
+2. Execute the following query inside your database.
+Example -
 ```bash
 $ sudo -u postgres psql
 ```
@@ -60,7 +62,7 @@ CREATE FUNCTION mystem_convert(text) RETURNS text AS '$libdir/pg_mystem' LANGUAG
 $ sudo service postgresql restart
 ```
 
-That's all. Now you can use Mystem from PostgreSQL.
+That's all. Now you can use `mystem` from `PostgreSQL`.
 ```SQL
 SELECT mystem_convert('Ехал грека через реку, сунул грека руку в реку');
                 mystem_convert                 
