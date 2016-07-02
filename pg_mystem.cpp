@@ -236,7 +236,6 @@ public:
                         if (pos == std::string::npos) {
                             pos = docLengthMax - 1;
                         }
-                        elog(LOG, "MYSTEM: pos = %lu", pos);
                         text = text.substr(0, pos + 1);
                     }
                     strncpy(m_inQueue[i].m_text,
