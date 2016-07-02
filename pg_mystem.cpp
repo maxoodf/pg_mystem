@@ -383,117 +383,123 @@ extern "C" {
                 close(stdoutPipe[0]);
                 close(stdinPipe[1]);
 
-                inOutQueue_t inOutQueue;
-                if (!inOutQueue.isOK()) {
-                    elog(ERROR, "MYSTEM: failed to attach queue");
-                    proc_exit(1);
-                }
-
                 pqsignal(SIGTERM, mystemSigterm);
                 BackgroundWorkerUnblockSignals();
-                
-                elog(LOG, "MYSTEM: initialized");
-                
-                while (!terminated) {
-                    std::string writeLine;
-                    uint64_t id = inOutQueue.getInQueueRecord(writeLine);
-                    std::string normLine;
-                    if (id > 0) {
-                        if (writeLine.length() > 0) {
-                            std::size_t ttl = 0;
-                            while (true) {
-                                ssize_t wrote = write(stdoutPipe[1], writeLine.c_str() + ttl, writeLine.length() - ttl);
-                                if (wrote < 0) {
-                                    elog(LOG, "MYSTEM: write to mystem failed");
-                                    break;
-                                }
-                                ttl += wrote;
-                                if (wrote == 0 || ttl >= writeLine.length()) {
-                                    break;
-                                }
-                            }
-                            
-                            std::vector<std::string> normLines;
-                            std::string readLine;
-                            char rChar = 0;
-                            while (true) {
-                                ssize_t red = read(stdinPipe[0], &rChar, sizeof(rChar));
-                                if (red > 0) {
-                                    if (rChar == '\n') {
-                                        if (readLine.find(mystemParagraphEndMarker) != std::string::npos) {
-                                            normLines.push_back(readLine);
-                                            readLine.clear();
-                                            break;
-                                        } else {
-                                            normLines.push_back(readLine);
-                                            readLine.clear();
-                                        }
-                                    } else {
-                                        readLine += rChar;
+
+                try {
+                    inOutQueue_t inOutQueue;
+                    if (!inOutQueue.isOK()) {
+                        elog(ERROR, "MYSTEM: failed to attach queue");
+                        proc_exit(1);
+                    }
+                    
+                    elog(LOG, "MYSTEM: initialized");
+                    
+                    while (!terminated) {
+                        std::string writeLine;
+                        uint64_t id = inOutQueue.getInQueueRecord(writeLine);
+                        std::string normLine;
+                        if (id > 0) {
+                            if (writeLine.length() > 0) {
+                                std::size_t ttl = 0;
+                                while (true) {
+                                    ssize_t wrote = write(stdoutPipe[1], writeLine.c_str() + ttl, writeLine.length() - ttl);
+                                    if (wrote < 0) {
+                                        elog(LOG, "MYSTEM: write to mystem failed");
+                                        break;
                                     }
-                                } else if (red <= 0) {
-                                    break;
+                                    ttl += wrote;
+                                    if (wrote == 0 || ttl >= writeLine.length()) {
+                                        break;
+                                    }
                                 }
-                            }
-                            
-                            for (auto nli:normLines) {
-                                rapidjson::Document jsonDoc;
-                                jsonDoc.Parse<0>(nli.c_str());
-                                if (jsonDoc.IsArray()) {
-                                    const rapidjson::Value &array = jsonDoc;
-                                    for (rapidjson::SizeType i = 0; i < array.Size(); ++i) {
-                                        std::string anlsStr;
-                                        if (array[i].HasMember("analysis")) {
-                                            if (array[i]["analysis"].IsArray()) {
-                                                const rapidjson::Value &analysis = array[i]["analysis"];
-                                                for (rapidjson::SizeType j = 0; j < analysis.Size(); ++j) {
-                                                    if (analysis[j].HasMember("lex")) {
-                                                        anlsStr = analysis[j]["lex"].GetString();
-                                                    } else {
-                                                        elog(LOG, "MYSTEM: JSON format error");
-                                                        break;
+                                
+                                std::vector<std::string> normLines;
+                                std::string readLine;
+                                char rChar = 0;
+                                while (true) {
+                                    ssize_t red = read(stdinPipe[0], &rChar, sizeof(rChar));
+                                    if (red > 0) {
+                                        if (rChar == '\n') {
+                                            if (readLine.find(mystemParagraphEndMarker) != std::string::npos) {
+                                                normLines.push_back(readLine);
+                                                readLine.clear();
+                                                break;
+                                            } else {
+                                                normLines.push_back(readLine);
+                                                readLine.clear();
+                                            }
+                                        } else {
+                                            readLine += rChar;
+                                        }
+                                    } else if (red <= 0) {
+                                        break;
+                                    }
+                                }
+                                
+                                for (auto nli:normLines) {
+                                    rapidjson::Document jsonDoc;
+                                    jsonDoc.Parse<0>(nli.c_str());
+                                    if (jsonDoc.IsArray()) {
+                                        const rapidjson::Value &array = jsonDoc;
+                                        for (rapidjson::SizeType i = 0; i < array.Size(); ++i) {
+                                            std::string anlsStr;
+                                            if (array[i].HasMember("analysis")) {
+                                                if (array[i]["analysis"].IsArray()) {
+                                                    const rapidjson::Value &analysis = array[i]["analysis"];
+                                                    for (rapidjson::SizeType j = 0; j < analysis.Size(); ++j) {
+                                                        if (analysis[j].HasMember("lex")) {
+                                                            anlsStr = analysis[j]["lex"].GetString();
+                                                        } else {
+                                                            elog(LOG, "MYSTEM: JSON format error");
+                                                            break;
+                                                        }
                                                     }
+                                                } else {
+                                                    elog(LOG, "MYSTEM: JSON format error");
+                                                    break;
+                                                }
+                                            }
+                                            if (array[i].HasMember("text")) {
+                                                if (anlsStr.length() == 0) {
+                                                    std::string text = array[i]["text"].GetString();
+                                                    if (text != mystemParagraphEndMarker && text != "\n") {
+                                                        std::replace(text.begin(), text.end(), '\n', ' ');
+                                                        normLine += text;
+                                                    }
+                                                } else {
+                                                    normLine += anlsStr;
                                                 }
                                             } else {
                                                 elog(LOG, "MYSTEM: JSON format error");
                                                 break;
                                             }
                                         }
-                                        if (array[i].HasMember("text")) {
-                                            if (anlsStr.length() == 0) {
-                                                std::string text = array[i]["text"].GetString();
-                                                if (text != mystemParagraphEndMarker && text != "\n") {
-                                                    std::replace(text.begin(), text.end(), '\n', ' ');
-                                                    normLine += text;
-                                                }
-                                            } else {
-                                                normLine += anlsStr;
-                                            }
-                                        } else {
-                                            elog(LOG, "MYSTEM: JSON format error");
-                                            break;
-                                        }
+                                    } else {
+                                        elog(LOG, "MYSTEM: JSON parsing failed");
                                     }
+                                }
+                            }
+                            
+                            while (true) {
+                                if (inOutQueue.setOutQueueRecord(id, normLine)) {
+                                    break;
                                 } else {
-                                    elog(LOG, "MYSTEM: JSON parsing failed");
+                                    usleep(queueWaitTimeout);
                                 }
                             }
                         }
                         
-                        while (true) {
-                            if (inOutQueue.setOutQueueRecord(id, normLine)) {
-                                break;
-                            } else {
-                                usleep(queueWaitTimeout);
-                            }
+                        int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 10L);
+                        ResetLatch(MyLatch);
+                        if (rc & WL_POSTMASTER_DEATH) {
+                            break;
                         }
                     }
-
-                    int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 10L);
-                    ResetLatch(MyLatch);
-                    if (rc & WL_POSTMASTER_DEATH) {
-                        break;
-                    }
+                } catch (const std::exception &_e) {
+                    elog(LOG, "MYSTEM: critical error: %s", _e.what());
+                } catch (...) {
+                    elog(LOG, "MYSTEM: unknown critical");
                 }
                 
                 elog(LOG, "MYSTEM: worker is shutting down");
@@ -557,33 +563,39 @@ extern "C" {
             PG_RETURN_NULL();
         }
         
-        text *_line = PG_GETARG_TEXT_P(0);
-        std::string line(VARDATA(_line), VARSIZE(_line) - VARHDRSZ);
-
         std::string nrmLine;
-        if (line.length() > 0) {
-            inOutQueue_t inOutQueue;
-            if (!inOutQueue.isOK()) {
-                PG_RETURN_NULL();
-            }
+        try {
+            text *_line = PG_GETARG_TEXT_P(0);
+            std::string line(VARDATA(_line), VARSIZE(_line) - VARHDRSZ);
             
-            uint64_t id = 0;
-            while (true) {
-                id = inOutQueue.setInQueueRecord(line);
-                if (id != 0) {
-                    break;
-                } else {
-                    usleep(queueWaitTimeout);
+            if (line.length() > 0) {
+                inOutQueue_t inOutQueue;
+                if (!inOutQueue.isOK()) {
+                    PG_RETURN_NULL();
+                }
+                
+                uint64_t id = 0;
+                while (true) {
+                    id = inOutQueue.setInQueueRecord(line);
+                    if (id != 0) {
+                        break;
+                    } else {
+                        usleep(queueWaitTimeout);
+                    }
+                }
+                
+                while (true) {
+                    if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
+                        break;
+                    } else {
+                        usleep(queueWaitTimeout);
+                    }
                 }
             }
-            
-            while (true) {
-                if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
-                    break;
-                } else {
-                    usleep(queueWaitTimeout);
-                }
-            }
+        } catch (const std::exception &_e) {
+            elog(LOG, "MYSTEM: mystem_convert critical error: %s", _e.what());
+        } catch (...) {
+            elog(LOG, "MYSTEM: mystem_convert unknown critical");
         }
 
         PG_RETURN_TEXT_P(cstring_to_text(nrmLine.c_str()));
