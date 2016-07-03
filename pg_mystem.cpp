@@ -43,7 +43,7 @@ static const std::string mystemParagraphEndMarker = "EndOfArticleMarker";
 // document[DOC_LEN_MAX] + ' ' + "EndOfArticleMarker" + '\n' + '\0'
 static const uint32_t docAndPostfixLengthMax = docLengthMax + 21 * sizeof(char);
 
-static const useconds_t queueWaitTimeout = 1000; // wait for a record, microseconds
+static const useconds_t queueWaitTimeoutMax = 100000; // wait for a record, microseconds
 
 class inOutQueue_t {
 public:
@@ -485,12 +485,12 @@ extern "C" {
                                 if (inOutQueue.setOutQueueRecord(id, normLine)) {
                                     break;
                                 } else {
-                                    usleep(queueWaitTimeout);
+                                    usleep(1L);
                                 }
                             }
                         }
                         
-                        int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 10L);
+                        int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 1L);
                         ResetLatch(MyLatch);
                         if (rc & WL_POSTMASTER_DEATH) {
                             break;
@@ -531,7 +531,7 @@ extern "C" {
         BackgroundWorkerUnblockSignals();
 
         while (!terminated) {
-            int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, queueWaitTimeout);
+            int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 1000L);
             ResetLatch(MyLatch);
             if (rc & WL_POSTMASTER_DEATH) {
                 break;
@@ -580,7 +580,7 @@ extern "C" {
                     if (id != 0) {
                         break;
                     } else {
-                        usleep(queueWaitTimeout);
+                        usleep(1L);
                     }
                 }
                 
@@ -588,7 +588,7 @@ extern "C" {
                     if (inOutQueue.getOutQueueRecord(id, nrmLine)) {
                         break;
                     } else {
-                        usleep(queueWaitTimeout);
+                        usleep(1L);
                     }
                 }
             }
