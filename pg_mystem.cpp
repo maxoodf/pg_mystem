@@ -43,7 +43,7 @@ static const std::string mystemParagraphEndMarker = "EndOfArticleMarker";
 // document[DOC_LEN_MAX] + ' ' + "EndOfArticleMarker" + '\n' + '\0'
 static const uint32_t docAndPostfixLengthMax = docLengthMax + 21 * sizeof(char);
 
-static const useconds_t queueWaitTimeoutMax = 100000; // wait for a record, microseconds
+static const useconds_t queueWaitTimeoutMax = 1000L; // wait for a record, milliseconds
 
 class inOutQueue_t {
 public:
@@ -395,11 +395,13 @@ extern "C" {
                     
                     elog(LOG, "MYSTEM: initialized");
                     
+                    long currTimeout = 0;
                     while (!terminated) {
                         std::string writeLine;
                         uint64_t id = inOutQueue.getInQueueRecord(writeLine);
                         std::string normLine;
                         if (id > 0) {
+                            currTimeout = 0;
                             if (writeLine.length() > 0) {
                                 std::size_t ttl = 0;
                                 while (true) {
@@ -490,7 +492,12 @@ extern "C" {
                             }
                         }
                         
-                        int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 1L);
+                        currTimeout = (currTimeout + 1) * 2;
+                        if (currTimeout > queueWaitTimeoutMax) {
+                            currTimeout = queueWaitTimeoutMax;
+                        }
+                        
+                        int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, currTimeout);
                         ResetLatch(MyLatch);
                         if (rc & WL_POSTMASTER_DEATH) {
                             break;
