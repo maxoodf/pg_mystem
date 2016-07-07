@@ -26,305 +26,307 @@ extern "C" {
     PG_MODULE_MAGIC;
 }
 
+namespace pg_ms {
 #ifndef DOC_LEN_MAX
-    #error "DOC_LEN_MAX must be defined"
+#error "DOC_LEN_MAX must be defined"
 #else
     static const uint32_t docLengthMax = DOC_LEN_MAX;
 #endif
-
+    
 #ifndef MYSTEM_PROCS
-    #error "MYSTEM_PROCS must be defined"
+#error "MYSTEM_PROCS must be defined"
 #else
     static const uint8_t mystemProcNo = MYSTEM_PROCS;
 #endif
-
-static const std::string mystemParagraphEndMarker = "EndOfArticleMarker";
-
-// document[DOC_LEN_MAX] + ' ' + "EndOfArticleMarker" + '\n' + '\0'
-static const uint32_t docAndPostfixLengthMax = docLengthMax + 21 * sizeof(char);
-
-static const useconds_t queueWaitTimeoutMax = 1000L; // wait for a record, milliseconds
-
-class inOutQueue_t {
-public:
-    static const uint16_t queueRecordsMax;
     
-    struct inQueueRecord_t {
-        uint64_t m_id;
-        char m_text[docAndPostfixLengthMax];
-    };
-    struct outQueueRecord_t {
-        uint64_t m_id;
-        char m_text[docAndPostfixLengthMax];
-    };
+    static const std::string mystemParagraphEndMarker = "EndOfArticleMarker";
     
-private:
-    static const char *inQueueSemName;
-    static const char *inQueueShmName;
+    // document[DOC_LEN_MAX] + ' ' + "EndOfArticleMarker" + '\n' + '\0'
+    static const uint32_t docAndPostfixLengthMax = docLengthMax + 21 * sizeof(char);
     
-    static const char *outQueueSemName;
-    static const char *outQueueShmName;
-
-    sem_t *m_inQueueSem;
-    sem_t *m_outQueueSem;
+    static const useconds_t queueWaitTimeoutMax = 1000L; // wait for a record, milliseconds
     
-    int m_inQueueShm;
-    int m_outQueueShm;
-    
-    inQueueRecord_t *m_inQueue;
-    outQueueRecord_t *m_outQueue;
-    
-    bool m_OK;
-    int m_errCode;
-    
-public:
-    static bool init() {
-        sem_t *inQueueSem = sem_open(inQueueSemName, O_CREAT, 0600, 0);
-        if (inQueueSem == SEM_FAILED) {
-            elog(LOG, "MYSTEM: inOutQueue(1) init error = %d, %s", errno, strerror(errno));
-            return false;
+    class inOutQueue_t {
+    public:
+        static const uint16_t queueRecordsMax;
+        
+        struct inQueueRecord_t {
+            uint64_t m_id;
+            char m_text[docAndPostfixLengthMax];
+        };
+        struct outQueueRecord_t {
+            uint64_t m_id;
+            char m_text[docAndPostfixLengthMax];
+        };
+        
+    private:
+        static const char *inQueueSemName;
+        static const char *inQueueShmName;
+        
+        static const char *outQueueSemName;
+        static const char *outQueueShmName;
+        
+        sem_t *m_inQueueSem;
+        sem_t *m_outQueueSem;
+        
+        int m_inQueueShm;
+        int m_outQueueShm;
+        
+        inQueueRecord_t *m_inQueue;
+        outQueueRecord_t *m_outQueue;
+        
+        bool m_OK;
+        int m_errCode;
+        
+    public:
+        static bool init() {
+            sem_t *inQueueSem = sem_open(inQueueSemName, O_CREAT, 0600, 0);
+            if (inQueueSem == SEM_FAILED) {
+                elog(LOG, "MYSTEM: inOutQueue(1) init error = %d, %s", errno, strerror(errno));
+                return false;
+            }
+            
+            sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
+            if (outQueueSem == SEM_FAILED) {
+                elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
+                return false;
+            }
+            
+            int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_RDWR, 0600);
+            if (inQueueShm == -1) {
+                elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
+                return false;
+            }
+            
+            int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_RDWR), 0600);
+            if (outQueueShm == -1) {
+                elog(LOG, "MYSTEM: inOutQueue(4) init error = %d, %s", errno, strerror(errno));
+                return false;
+            }
+            
+            if (ftruncate(inQueueShm, (off_t) sizeof(inQueueRecord_t) * queueRecordsMax) != 0) {
+                elog(LOG, "MYSTEM: inOutQueue(5) init error = %d, %s", errno, strerror(errno));
+            }
+            
+            if (ftruncate(outQueueShm, (off_t) sizeof(outQueueRecord_t) * queueRecordsMax) != 0) {
+                elog(LOG, "MYSTEM: inOutQueue(6) init error = %d, %s", errno, strerror(errno));
+            }
+            
+            inQueueRecord_t *inQueue = (inQueueRecord_t *) mmap((void *) 0, sizeof(inQueueRecord_t) * queueRecordsMax,
+                                                                PROT_WRITE, MAP_SHARED, inQueueShm, (off_t) 0);
+            if (inQueue == MAP_FAILED) {
+                elog(LOG, "MYSTEM: inOutQueue(7) init error = %d, %s", errno, strerror(errno));
+                return false;
+            }
+            outQueueRecord_t *outQueue = (outQueueRecord_t *) mmap((void *) 0, sizeof(outQueueRecord_t) * queueRecordsMax,
+                                                                   PROT_WRITE, MAP_SHARED, outQueueShm, (off_t) 0);
+            if (outQueue == MAP_FAILED) {
+                elog(LOG, "MYSTEM: inOutQueue(8) init error = %d, %s", errno, strerror(errno));
+                return false;
+            }
+            
+            bzero((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
+            bzero((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
+            
+            munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
+            close(inQueueShm);
+            sem_post(inQueueSem);
+            
+            munmap((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
+            close(outQueueShm);
+            sem_post(outQueueSem);
+            
+            return true;
         }
         
-        sem_t *outQueueSem = sem_open(outQueueSemName, O_CREAT, 0600, 0);
-        if (outQueueSem == SEM_FAILED) {
-            elog(LOG, "MYSTEM: inOutQueue(2) init error = %d, %s", errno, strerror(errno));
-            return false;
-        }
-
-        int inQueueShm = shm_open(inQueueShmName, O_CREAT | O_RDWR, 0600);
-        if (inQueueShm == -1) {
-            elog(LOG, "MYSTEM: inOutQueue(3) init error = %d, %s", errno, strerror(errno));
-            return false;
+        static void release() {
+            sem_unlink(inQueueSemName);
+            shm_unlink(inQueueShmName);
+            
+            sem_unlink(outQueueSemName);
+            shm_unlink(outQueueShmName);
         }
         
-        int outQueueShm = shm_open(outQueueShmName, (O_CREAT | O_RDWR), 0600);
-        if (outQueueShm == -1) {
-            elog(LOG, "MYSTEM: inOutQueue(4) init error = %d, %s", errno, strerror(errno));
-            return false;
-        }
-
-        if (ftruncate(inQueueShm, (off_t) sizeof(inQueueRecord_t) * queueRecordsMax) != 0) {
-            elog(LOG, "MYSTEM: inOutQueue(5) init error = %d, %s", errno, strerror(errno));
-        }
-        
-        if (ftruncate(outQueueShm, (off_t) sizeof(outQueueRecord_t) * queueRecordsMax) != 0) {
-            elog(LOG, "MYSTEM: inOutQueue(6) init error = %d, %s", errno, strerror(errno));
-        }
-
-        inQueueRecord_t *inQueue = (inQueueRecord_t *) mmap((void *) 0, sizeof(inQueueRecord_t) * queueRecordsMax,
-                                 PROT_WRITE, MAP_SHARED, inQueueShm, (off_t) 0);
-        if (inQueue == MAP_FAILED) {
-            elog(LOG, "MYSTEM: inOutQueue(7) init error = %d, %s", errno, strerror(errno));
-            return false;
-        }
-        outQueueRecord_t *outQueue = (outQueueRecord_t *) mmap((void *) 0, sizeof(outQueueRecord_t) * queueRecordsMax,
-                                  PROT_WRITE, MAP_SHARED, outQueueShm, (off_t) 0);
-        if (outQueue == MAP_FAILED) {
-            elog(LOG, "MYSTEM: inOutQueue(8) init error = %d, %s", errno, strerror(errno));
-            return false;
-        }
-        
-        bzero((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
-        bzero((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
-        
-        munmap((void *) inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
-        close(inQueueShm);
-        sem_post(inQueueSem);
-        
-        munmap((void *) outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
-        close(outQueueShm);
-        sem_post(outQueueSem);
-        
-        return true;
-    }
-    
-    static void release() {
-        sem_unlink(inQueueSemName);
-        shm_unlink(inQueueShmName);
-        
-        sem_unlink(outQueueSemName);
-        shm_unlink(outQueueShmName);
-    }
-
-    inOutQueue_t(): m_inQueueSem(SEM_FAILED), m_outQueueSem(SEM_FAILED), m_inQueueShm(-1), m_outQueueShm(-1),
-                    m_inQueue(nullptr), m_outQueue(nullptr), m_OK(false), m_errCode(0) {
-        m_inQueueSem = sem_open(inQueueSemName, 0);
-        if (m_inQueueSem == SEM_FAILED) {
-            m_errCode = errno;
-            return;
+        inOutQueue_t(): m_inQueueSem(SEM_FAILED), m_outQueueSem(SEM_FAILED), m_inQueueShm(-1), m_outQueueShm(-1),
+        m_inQueue(nullptr), m_outQueue(nullptr), m_OK(false), m_errCode(0) {
+            m_inQueueSem = sem_open(inQueueSemName, 0);
+            if (m_inQueueSem == SEM_FAILED) {
+                m_errCode = errno;
+                return;
+            }
+            
+            m_outQueueSem = sem_open(outQueueSemName, 0);
+            if (m_outQueueSem == SEM_FAILED) {
+                m_errCode = errno;
+                return;
+            }
+            
+            m_inQueueShm = shm_open(inQueueShmName, O_RDWR, 0600);
+            if (m_inQueueShm == -1) {
+                m_errCode = errno;
+                return;
+            }
+            
+            m_outQueueShm = shm_open(outQueueShmName, O_RDWR, 0600);
+            if (m_outQueueShm == -1) {
+                m_errCode = errno;
+                return;
+            }
+            
+            m_inQueue = (inQueueRecord_t *) mmap((void *) 0, sizeof(inQueueRecord_t) * queueRecordsMax,
+                                                 PROT_WRITE, MAP_SHARED, m_inQueueShm, (off_t) 0);
+            if (m_inQueue == MAP_FAILED) {
+                m_errCode = errno;
+                return;
+            }
+            
+            m_outQueue = (outQueueRecord_t *) mmap((void *) 0, sizeof(outQueueRecord_t) * queueRecordsMax,
+                                                   PROT_WRITE, MAP_SHARED, m_outQueueShm, (off_t) 0);
+            if (m_outQueue == MAP_FAILED) {
+                m_errCode = errno;
+                return;
+            }
+            
+            m_OK = true;
         }
         
-        m_outQueueSem = sem_open(outQueueSemName, 0);
-        if (m_outQueueSem == SEM_FAILED) {
-            m_errCode = errno;
-            return;
+        ~inOutQueue_t() {
+            if (m_inQueue != nullptr) {
+                munmap(m_inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
+            }
+            if (m_inQueueShm > 0) {
+                close(m_inQueueShm);
+            }
+            if (m_inQueueSem != SEM_FAILED) {
+                sem_close(m_inQueueSem);
+            }
+            
+            if (m_outQueue != nullptr) {
+                munmap(m_outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
+            }
+            if (m_outQueueShm > 0) {
+                close(m_outQueueShm);
+            }
+            if (m_outQueueSem != SEM_FAILED) {
+                sem_close(m_outQueueSem);
+            }
         }
         
-        m_inQueueShm = shm_open(inQueueShmName, O_RDWR, 0600);
-        if (m_inQueueShm == -1) {
-            m_errCode = errno;
-            return;
+        bool isOK() const {
+            return m_OK;
         }
         
-        m_outQueueShm = shm_open(outQueueShmName, O_RDWR, 0600);
-        if (m_outQueueShm == -1) {
-            m_errCode = errno;
-            return;
+        int errCode() const {
+            return m_errCode;
         }
         
-        m_inQueue = (inQueueRecord_t *) mmap((void *) 0, sizeof(inQueueRecord_t) * queueRecordsMax,
-                                                        PROT_WRITE, MAP_SHARED, m_inQueueShm, (off_t) 0);
-        if (m_inQueue == MAP_FAILED) {
-            m_errCode = errno;
-            return;
-        }
+        uint64_t setInQueueRecord(const std::string &_text) {
+            uint64_t ret = 0;
+            if (sem_trywait(m_inQueueSem) == 0) {
+                for (auto i = 0; i < queueRecordsMax; ++i) {
+                    if (m_inQueue[i].m_id == 0) {
+                        std::random_device rd;
+                        std::mt19937 gen(rd());
+                        std::uniform_int_distribution<> dis(1, std::numeric_limits<int>::max());
+                        ret = m_inQueue[i].m_id = dis(gen);
                         
-        m_outQueue = (outQueueRecord_t *) mmap((void *) 0, sizeof(outQueueRecord_t) * queueRecordsMax,
-                                                         PROT_WRITE, MAP_SHARED, m_outQueueShm, (off_t) 0);
-        if (m_outQueue == MAP_FAILED) {
-            m_errCode = errno;
-            return;
-        }
-
-        m_OK = true;
-    }
-    
-    ~inOutQueue_t() {
-        if (m_inQueue != nullptr) {
-            munmap(m_inQueue, sizeof(inQueueRecord_t) * queueRecordsMax);
-        }
-        if (m_inQueueShm > 0) {
-            close(m_inQueueShm);
-        }
-        if (m_inQueueSem != SEM_FAILED) {
-            sem_close(m_inQueueSem);
-        }
-
-        if (m_outQueue != nullptr) {
-            munmap(m_outQueue, sizeof(outQueueRecord_t) * queueRecordsMax);
-        }
-        if (m_outQueueShm > 0) {
-            close(m_outQueueShm);
-        }
-        if (m_outQueueSem != SEM_FAILED) {
-            sem_close(m_outQueueSem);
-        }
-    }
-    
-    bool isOK() const {
-        return m_OK;
-    }
-    
-    int errCode() const {
-        return m_errCode;
-    }
-    
-    uint64_t setInQueueRecord(const std::string &_text) {
-        uint64_t ret = 0;
-        if (sem_trywait(m_inQueueSem) == 0) {
-            for (auto i = 0; i < queueRecordsMax; ++i) {
-                if (m_inQueue[i].m_id == 0) {
-                    std::random_device rd;
-                    std::mt19937 gen(rd());
-                    std::uniform_int_distribution<> dis(0, std::numeric_limits<int>::max());
-                    ret = m_inQueue[i].m_id = dis(gen);
-
-                    std::string text = _text;
-                    if (text.length() > docLengthMax) {
-                        const char delimChars[] = " .,!@#$%^&*()_-+={[}];:'\"~`<>?/\n\t";
-                        std::size_t pos = text.find_last_of(delimChars, docLengthMax - 1, 1);
-                        if (pos == std::string::npos) {
-                            pos = docLengthMax - 1;
+                        std::string text = _text;
+                        if (text.length() > docLengthMax) {
+                            const char delimChars[] = " .,!@#$%^&*()_-+={[}];:'\"~`<>?/\n\t";
+                            std::size_t pos = text.find_last_of(delimChars, docLengthMax - 1, 1);
+                            if (pos == std::string::npos) {
+                                pos = docLengthMax - 1;
+                            }
+                            text = text.substr(0, pos + 1);
                         }
-                        text = text.substr(0, pos + 1);
+                        strncpy(m_inQueue[i].m_text,
+                                (text + " " + mystemParagraphEndMarker + "\n").c_str(),
+                                docAndPostfixLengthMax - 1);
+                        break;
                     }
-                    strncpy(m_inQueue[i].m_text,
-                            (text + " " + mystemParagraphEndMarker + "\n").c_str(),
-                            docAndPostfixLengthMax - 1);
-                    break;
                 }
+                sem_post(m_inQueueSem);
             }
-            sem_post(m_inQueueSem);
+            
+            return ret;
         }
         
-        return ret;
-    }
-    
-    uint64_t getInQueueRecord(std::string &_text) {
-        uint64_t ret = 0;
-        if (sem_trywait(m_inQueueSem) == 0) {
-            for (auto i = 0; i < queueRecordsMax; ++i) {
-                if (m_inQueue[i].m_id != 0) {
-                    ret = m_inQueue[i].m_id;
-                    m_inQueue[i].m_id = 0;
-                    _text = m_inQueue[i].m_text;
-                    bzero((void *) m_inQueue[i].m_text, docAndPostfixLengthMax);
-                    break;
-                }
-            }
-            sem_post(m_inQueueSem);
-        }
-        
-        return ret;
-    }
-    
-    bool setOutQueueRecord(uint64_t _id, const std::string &_text) {
-        bool ret = false;
-        if (sem_trywait(m_outQueueSem) == 0) {
-            for (auto i = 0; i < queueRecordsMax; ++i) {
-                if (m_outQueue[i].m_id == 0) {
-                    m_outQueue[i].m_id = _id;
-                    std::string text = _text;
-                    if (text.length() > docAndPostfixLengthMax - 2) {
-                        text = text.substr(0, docAndPostfixLengthMax - 2);
+        uint64_t getInQueueRecord(std::string &_text) {
+            uint64_t ret = 0;
+            if (sem_trywait(m_inQueueSem) == 0) {
+                for (auto i = 0; i < queueRecordsMax; ++i) {
+                    if (m_inQueue[i].m_id != 0) {
+                        ret = m_inQueue[i].m_id;
+                        m_inQueue[i].m_id = 0;
+                        _text = m_inQueue[i].m_text;
+                        bzero((void *) m_inQueue[i].m_text, docAndPostfixLengthMax);
+                        break;
                     }
-                    strncpy(m_outQueue[i].m_text,
-                            (text + "\n").c_str(),
-                            docAndPostfixLengthMax - 1);
-                    ret = true;
-                    break;
                 }
+                sem_post(m_inQueueSem);
             }
-            sem_post(m_outQueueSem);
+            
+            return ret;
         }
         
-        return ret;
-    }
-    
-    bool getOutQueueRecord(uint64_t _id, std::string &_text) {
-        bool ret = false;
-        if (sem_trywait(m_outQueueSem) == 0) {
-            for (auto i = 0; i < queueRecordsMax; ++i) {
-                if (m_outQueue[i].m_id == _id) {
-                    m_outQueue[i].m_id = 0;
-                    _text = m_outQueue[i].m_text;
-                    bzero((void *) m_outQueue[i].m_text, docAndPostfixLengthMax);
-                    ret = true;
-                    break;
+        bool setOutQueueRecord(uint64_t _id, const std::string &_text) {
+            bool ret = false;
+            if (sem_trywait(m_outQueueSem) == 0) {
+                for (auto i = 0; i < queueRecordsMax; ++i) {
+                    if (m_outQueue[i].m_id == 0) {
+                        m_outQueue[i].m_id = _id;
+                        std::string text = _text;
+                        if (text.length() > docAndPostfixLengthMax - 2) {
+                            text = text.substr(0, docAndPostfixLengthMax - 2);
+                        }
+                        strncpy(m_outQueue[i].m_text,
+                                (text + "\n").c_str(),
+                                docAndPostfixLengthMax - 1);
+                        ret = true;
+                        break;
+                    }
                 }
+                sem_post(m_outQueueSem);
             }
-            sem_post(m_outQueueSem);
+            
+            return ret;
         }
         
-        return ret;
-    }
+        bool getOutQueueRecord(uint64_t _id, std::string &_text) {
+            bool ret = false;
+            if (sem_trywait(m_outQueueSem) == 0) {
+                for (auto i = 0; i < queueRecordsMax; ++i) {
+                    if (m_outQueue[i].m_id == _id) {
+                        m_outQueue[i].m_id = 0;
+                        _text = m_outQueue[i].m_text;
+                        bzero((void *) m_outQueue[i].m_text, docAndPostfixLengthMax);
+                        ret = true;
+                        break;
+                    }
+                }
+                sem_post(m_outQueueSem);
+            }
+            
+            return ret;
+        }
+        
+    private:
+        
+    };
     
-private:
-
-};
-
-const uint16_t inOutQueue_t::queueRecordsMax = mystemProcNo * 2;
-const char *inOutQueue_t::inQueueSemName = "/pg_mystemInQueueSem";
-const char *inOutQueue_t::inQueueShmName = "/pg_mystemInQueueShm";
-const char *inOutQueue_t::outQueueSemName = "/pg_mystemOutQueueSem";
-const char *inOutQueue_t::outQueueShmName = "/pg_mystemOutQueueShm";
+    const uint16_t inOutQueue_t::queueRecordsMax = mystemProcNo * 2;
+    const char *inOutQueue_t::inQueueSemName = "/pg_mystemInQueueSem";
+    const char *inOutQueue_t::inQueueShmName = "/pg_mystemInQueueShm";
+    const char *inOutQueue_t::outQueueSemName = "/pg_mystemOutQueueSem";
+    const char *inOutQueue_t::outQueueShmName = "/pg_mystemOutQueueShm";
+}
 
 extern "C" {
-    static volatile sig_atomic_t terminated = false;
+    static volatile sig_atomic_t mystemTerminated = false;
     
     static void mystemSigterm(SIGNAL_ARGS) {
         int save_errno = errno;
-        terminated = true;
+        mystemTerminated = true;
         SetLatch(MyLatch);
         errno = save_errno;
     }
@@ -337,7 +339,7 @@ extern "C" {
         #define SHARE_FOLDER_STR xstr(SHARE_FOLDER)
     #endif
 
-    static void createChilds(Datum _arg) {
+    void createMystemChilds(Datum _arg) {
         int stdinPipe[2];
         int stdoutPipe[2];
         
@@ -387,7 +389,7 @@ extern "C" {
                 BackgroundWorkerUnblockSignals();
 
                 try {
-                    inOutQueue_t inOutQueue;
+                    pg_ms::inOutQueue_t inOutQueue;
                     if (!inOutQueue.isOK()) {
                         elog(ERROR, "MYSTEM: failed to attach queue");
                         proc_exit(1);
@@ -396,7 +398,7 @@ extern "C" {
                     elog(LOG, "MYSTEM: initialized");
                     
                     long currTimeout = 0;
-                    while (!terminated) {
+                    while (!mystemTerminated) {
                         std::string writeLine;
                         uint64_t id = inOutQueue.getInQueueRecord(writeLine);
                         std::string normLine;
@@ -423,7 +425,7 @@ extern "C" {
                                     ssize_t red = read(stdinPipe[0], &rChar, sizeof(rChar));
                                     if (red > 0) {
                                         if (rChar == '\n') {
-                                            if (readLine.find(mystemParagraphEndMarker) != std::string::npos) {
+                                            if (readLine.find(pg_ms::mystemParagraphEndMarker) != std::string::npos) {
                                                 normLines.push_back(readLine);
                                                 readLine.clear();
                                                 break;
@@ -465,7 +467,7 @@ extern "C" {
                                             if (array[i].HasMember("text")) {
                                                 if (anlsStr.length() == 0) {
                                                     std::string text = array[i]["text"].GetString();
-                                                    if (text != mystemParagraphEndMarker && text != "\n") {
+                                                    if (text != pg_ms::mystemParagraphEndMarker && text != "\n") {
                                                         std::replace(text.begin(), text.end(), '\n', ' ');
                                                         normLine += text;
                                                     }
@@ -493,8 +495,8 @@ extern "C" {
                         }
                         
                         currTimeout = (currTimeout + 1) * 2;
-                        if (currTimeout > queueWaitTimeoutMax) {
-                            currTimeout = queueWaitTimeoutMax;
+                        if (currTimeout > pg_ms::queueWaitTimeoutMax) {
+                            currTimeout = pg_ms::queueWaitTimeoutMax;
                         }
                         
                         int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, currTimeout);
@@ -517,8 +519,8 @@ extern "C" {
         }
     }
 
-    static void mainProc(Datum) {
-        if (!inOutQueue_t::init()) {
+    void mainMystemProc(Datum) {
+        if (!pg_ms::inOutQueue_t::init()) {
             elog(ERROR, "MYSTEM: queue initialisation failed");
             proc_exit(1);
         }
@@ -527,9 +529,9 @@ extern "C" {
         worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
         worker.bgw_start_time = BgWorkerStart_ConsistentState;
         worker.bgw_restart_time = BGW_NEVER_RESTART;
-        worker.bgw_main = createChilds;
+        worker.bgw_main = createMystemChilds;
         
-        for (auto i = 0; i < mystemProcNo; ++i) {
+        for (auto i = 0; i < pg_ms::mystemProcNo; ++i) {
             sprintf(worker.bgw_name, "mystem wrapper process %d", i + 1);
             RegisterDynamicBackgroundWorker(&worker, NULL);
         }
@@ -537,7 +539,7 @@ extern "C" {
         pqsignal(SIGTERM, mystemSigterm);
         BackgroundWorkerUnblockSignals();
 
-        while (!terminated) {
+        while (!mystemTerminated) {
             int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 1000L);
             ResetLatch(MyLatch);
             if (rc & WL_POSTMASTER_DEATH) {
@@ -547,7 +549,7 @@ extern "C" {
 
         elog(LOG, "MYSTEM: launcher is shutting down");
         
-        inOutQueue_t::release();
+        pg_ms::inOutQueue_t::release();
         proc_exit(0);
     }
     
@@ -558,7 +560,7 @@ extern "C" {
         worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
         worker.bgw_start_time = BgWorkerStart_RecoveryFinished;
         worker.bgw_restart_time = BGW_NEVER_RESTART;
-        worker.bgw_main = mainProc;
+        worker.bgw_main = mainMystemProc;
         worker.bgw_notify_pid = 0;
         
         RegisterBackgroundWorker(&worker);
@@ -566,7 +568,7 @@ extern "C" {
     
     PG_FUNCTION_INFO_V1(mystem_convert);
     Datum mystem_convert(PG_FUNCTION_ARGS) {
-        if(PG_ARGISNULL(0)) {
+        if (PG_ARGISNULL(0)) {
             PG_RETURN_NULL();
         }
         
@@ -576,7 +578,7 @@ extern "C" {
             std::string line(VARDATA(_line), VARSIZE(_line) - VARHDRSZ);
             
             if (line.length() > 0) {
-                inOutQueue_t inOutQueue;
+                pg_ms::inOutQueue_t inOutQueue;
                 if (!inOutQueue.isOK()) {
                     PG_RETURN_NULL();
                 }
@@ -602,7 +604,7 @@ extern "C" {
         } catch (const std::exception &_e) {
             elog(LOG, "MYSTEM: mystem_convert critical error: %s", _e.what());
         } catch (...) {
-            elog(LOG, "MYSTEM: mystem_convert unknown critical");
+            elog(LOG, "MYSTEM: mystem_convert unknown critical error");
         }
 
         PG_RETURN_TEXT_P(cstring_to_text(nrmLine.c_str()));
