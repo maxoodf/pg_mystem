@@ -34,7 +34,7 @@ You may wish to change `pg_mystem` default settings. All you need is to change M
 
 1. `DOC_LEN_MAX` - maximum document (string) length. If you work with a short lines, redefine `DOC_LEN_MAX` to 1000 chars or so. If you work with a large documents, redefine `DOC_LEN_MAX` to 100000 characters or so.
 
-2. `MYSTEM_PROCS` - how many `mystem` processes to run. I use the following value in my projects - one `mystem` process throughput is about 6 KB/sec. So if I need to process, say 30-35 KB of text in a second I use 6 `mystem` processes.
+2. `MYSTEM_PROCS` - how many `mystem` processes to run. I use the following value in my projects - one `mystem` process throughput is about 9 KB/sec (depends on hardware). So if I need to process, say 50 KB of text in a second I use 6 `mystem` processes.
 
 You will need to reinstall `pg_mystem` in case any of these parameters is changed.
 
