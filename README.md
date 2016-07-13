@@ -24,6 +24,8 @@ pg_mystem Installation
 ```bash
 $ git clone https://github.com/maxoodf/pg_mystem.git
 $ cd ./pg_mystem
+$ git submodule init
+$ git submodule update
 $ make
 $ sudo make install
 ```
