@@ -32,7 +32,7 @@ pg_mystem Configuration
 ============
 You may wish to change `pg_mystem` default settings. All you need is to change Makefile defined parameters - 
 
-1. `DOC_LEN_MAX` - maximum document (string) length. If you work with a short lines, redefine `DOC_LEN_MAX` to 1000 chars or so. If you work with a large documents, redefine `DOC_LEN_MAX` to 100000 characters or so.
+1. `DOC_LEN_MAX` - maximum document (string) length. If you work with a short lines, redefine `DOC_LEN_MAX` to 1000 chars or so. If you work with a large documents, redefine `DOC_LEN_MAX` to 100000 characters etc.
 
 2. `MYSTEM_PROCS` - how many `mystem` processes to run. I use the following value in my projects - one `mystem` process throughput is about 9 KB/sec (depends on hardware). So if I need to process, say 50 KB of text in a second I use 6 `mystem` processes.
 
@@ -55,7 +55,6 @@ $ sudo -u postgres psql
 ```SQL
 \connect YOUR_DB
 CREATE EXTENSION pg_mystem;
-CREATE FUNCTION mystem_convert(text) RETURNS text AS '$libdir/pg_mystem' LANGUAGE C IMMUTABLE STRICT;
 \q 
 ```
 ```bash
