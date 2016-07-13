@@ -12,7 +12,7 @@
 #include <limits>
 #include <algorithm>
 
-#include <rapidjson/document.h>
+#include "rapidjson/document.h"
 
 extern "C" {
     #include <postgres.h>
