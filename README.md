@@ -65,7 +65,7 @@ CREATE EXTENSION pg_mystem;
 \q 
 ```
 
-That's all. Now you can use `mystem` from `PostgreSQL`.
+That's all. Now you can use `mystem` from `PostgreSQL` queries.
 ```SQL
 SELECT mystem_convert('Ехал грека через реку, сунул грека руку в реку');
                 mystem_convert                 
