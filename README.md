@@ -49,7 +49,12 @@ Also you may need to change `max_worker_processes` to `MYSTEM_PROCS` + 1 at leas
 Example -
 `max_worker_processes = 24`
 
-2. Execute the following query inside your database.
+2. Restart `PostgreSQL`
+```bash
+$ sudo service postgresql restart
+```
+
+3. Execute the following query inside your database.
 Example -
 ```bash
 $ sudo -u postgres psql
@@ -58,9 +63,6 @@ $ sudo -u postgres psql
 \connect YOUR_DB
 CREATE EXTENSION pg_mystem;
 \q 
-```
-```bash
-$ sudo service postgresql restart
 ```
 
 That's all. Now you can use `mystem` from `PostgreSQL`.
