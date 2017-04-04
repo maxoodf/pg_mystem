@@ -1,7 +1,7 @@
 # **pg_mystem - расширение PostgreSQL для поддержки Yandex Mystem**
 `pg_mystem` - [расширение PostgreSQL](https://www.postgresql.org/docs/9.6/static/extend-extensions.html) для [Yandex mystem](https://tech.yandex.ru/mystem/) (стеммер или лемматизатор или морфологический нормализатор - точный термин, как я понимаю, в русском языке не определен). Основная функция данного расширения заключается в объединении лучшего, на мой взгляд, стеммера русского языка `mystem` и мощнейшей СУБД `PostgreSQL`.
 ### Установка Yandex Mystem
-Необходимо загрузить исполнимый файл [mystem](https://tech.yandex.ru/mystem/), соответствующий вашей архитектуре и скопировать его в share директорию `PostgreSQL`.  
+Необходимо загрузить исполнимый файл [mystem](https://tech.yandex.ru/mystem/), соответствующий вашей архитектуре, и скопировать его в share директорию `PostgreSQL`.  
 Пример:
 ```bash
 $ wget http://download.cdn.yandex.net/mystem/mystem-3.0-linux3.1-64bit.tar.gz
@@ -26,7 +26,7 @@ $ sudo make install
 ### Регистрация расширения pg_mystem
 1. Измените ваш конфигурационный файл `postgresql.conf`.
   - необходимо добавить следующую строку - `shared_preload_libraries = 'pg_mystem'`  
-  - возможно вам потребуется увелисить количество `max_worker_processes` до `MYSTEM_PROCS` + 1, как минимум. Например, строка конфигурационного файла - `max_worker_processes = 24`
+  - возможно, вам потребуется увелисить количество `max_worker_processes` до `MYSTEM_PROCS` + 1, как минимум. Например, строка конфигурационного файла - `max_worker_processes = 24`
 2. Перезапустите `PostgreSQL`
 ```bash
 $ sudo service postgresql restart
