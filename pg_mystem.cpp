@@ -22,6 +22,10 @@ extern "C" {
     #include <storage/latch.h>
     #include <fmgr.h>
     #include <utils/builtins.h>
+
+    #if PG_VERSION_NUM >= 100000
+    #include <pgstat.h>
+    #endif
     
     PG_MODULE_MAGIC;
 }
@@ -45,7 +49,31 @@ namespace pg_ms {
     static const uint32_t docAndPostfixLengthMax = docLengthMax + 21 * sizeof(char);
     
     static const useconds_t queueWaitTimeoutMax = 1000L; // wait for a record, milliseconds
-    
+
+    #if PG_VERSION_NUM >= 100000
+    static const char *moduleName = "pg_mystem";
+    static const int latchEventInfo = WAIT_EVENT_BGWRITER_HIBERNATE;
+    #endif
+
+    typedef void (*bgwMain_t)(Datum main_arg);
+
+    static int WaitLatch(volatile Latch *latch, int wakeEvents, long timeout) {
+    #if PG_VERSION_NUM < 100000
+        return ::WaitLatch(latch, wakeEvents, timeout);
+    #else
+        return ::WaitLatch(latch, wakeEvents, timeout, latchEventInfo);
+    #endif
+    }
+
+    static void setBgWorkerMain(BackgroundWorker &worker, bgwMain_t main, const char *mainName) {
+    #if PG_VERSION_NUM < 100000
+        worker.bgw_main = main;
+    #else
+        strncpy(worker.bgw_library_name, moduleName, BGW_MAXLEN);
+        strncpy(worker.bgw_function_name, mainName, BGW_MAXLEN);
+    #endif
+    }
+
     class inOutQueue_t {
     public:
         static const uint16_t queueRecordsMax;
@@ -499,7 +527,7 @@ extern "C" {
                             currTimeout = pg_ms::queueWaitTimeoutMax;
                         }
                         
-                        int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, currTimeout);
+                        int rc = pg_ms::WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, currTimeout);
                         ResetLatch(MyLatch);
                         if (rc & WL_POSTMASTER_DEATH) {
                             break;
@@ -529,8 +557,8 @@ extern "C" {
         worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
         worker.bgw_start_time = BgWorkerStart_ConsistentState;
         worker.bgw_restart_time = BGW_NEVER_RESTART;
-        worker.bgw_main = createMystemChilds;
-        
+        pg_ms::setBgWorkerMain(worker, createMystemChilds, "createMystemChilds");
+
         for (auto i = 0; i < pg_ms::mystemProcNo; ++i) {
             sprintf(worker.bgw_name, "mystem wrapper process %d", i + 1);
             RegisterDynamicBackgroundWorker(&worker, NULL);
@@ -540,7 +568,7 @@ extern "C" {
         BackgroundWorkerUnblockSignals();
 
         while (!mystemTerminated) {
-            int rc = WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 1000L);
+            int rc = pg_ms::WaitLatch(MyLatch, WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH, 1000L);
             ResetLatch(MyLatch);
             if (rc & WL_POSTMASTER_DEATH) {
                 break;
@@ -560,8 +588,8 @@ extern "C" {
         worker.bgw_flags = BGWORKER_SHMEM_ACCESS;
         worker.bgw_start_time = BgWorkerStart_RecoveryFinished;
         worker.bgw_restart_time = BGW_NEVER_RESTART;
-        worker.bgw_main = mainMystemProc;
         worker.bgw_notify_pid = 0;
+        pg_ms::setBgWorkerMain(worker, mainMystemProc, "mainMystemProc");
         
         RegisterBackgroundWorker(&worker);
     }
